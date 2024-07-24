@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "contacts_structures.h" 
+#include "contacts_structures.h"
 
 void removeNewlineChar(char* str) {
     char *newline = strchr(str, '\n');
@@ -107,4 +107,41 @@ void deleteContact(Node** head, size_t index) {
     }
     free(temp);
     printf("Контакт успешно удален!\n");
+}
+
+void readContactsFromFile(Node** head, const char* filename) {
+    FILE* file = fopen(filename, "rb");
+    if (!file) {
+        printf("Файл не найден. Будет создан новый список контактов.\n");
+        return;
+    }
+
+    Node* tail = NULL;
+    while (1) {
+        Node* newNode = malloc(sizeof(Node));
+        if (fread(newNode, sizeof(Node), 1, file) <= 0) break;
+        newNode->next = NULL;
+        newNode->prev = tail;
+        if (tail) tail->next = newNode;
+        else *head = newNode;
+        tail = newNode;
+    }
+
+    fclose(file);
+}
+
+void writeContactsToFile(Node* head, const char* filename) {
+    FILE* file = fopen(filename, "wb");
+    if (!file) {
+        printf("Ошибка открытия файла для записи.\n");
+        return;
+    }
+
+    Node* current = head;
+    while (current != NULL) {
+        fwrite(current, sizeof(Node), 1, file);
+        current = current->next;
+    }
+
+    fclose(file);
 }
