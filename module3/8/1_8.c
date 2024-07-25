@@ -3,30 +3,11 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <time.h>
-#include <signal.h>
 #include <semaphore.h>
-#include <fcntl.h> // Для использования O_CREAT
-
-// Объявления функций обработчиков сигналов
-void child_signal_handler(int sig) {
-    static int access_blocked = 0;
-
-    if (sig == SIGUSR1) {
-        access_blocked = 1;
-    } else if (sig == SIGUSR2) {
-        access_blocked = 0;
-    }
-}
-
-void parent_signal_handler(int sig) {
-    if (sig == SIGUSR2) {
-        printf("Дочерний процесс завершил запись числа.\n");
-    }
-}
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        printf("Использование: %s <количество чисел>\n", argv[0]);
+        printf("%s <количество чисел>\n", argv[0]);
         return 1;
     }
 
@@ -34,14 +15,11 @@ int main(int argc, char *argv[]) {
     int fd[2];
     pipe(fd);
 
-    sem_t *semaphore = sem_open("/my_semaphore", O_CREAT, 0644, 1); // Исправлено: добавлен #include <fcntl.h>
-    if (!semaphore) {
-        perror("Ошибка создания семафора");
+    sem_t semaphore;
+    if (sem_init(&semaphore, 1, 1) == -1) {
+        perror("Ошибка инициализации семафора");
         return 1;
     }
-
-    signal(SIGUSR1, child_signal_handler);
-    signal(SIGUSR2, parent_signal_handler);
 
     for (int i = 0; i < count; ++i) {
         pid_t pid = fork();
@@ -49,22 +27,20 @@ int main(int argc, char *argv[]) {
         if (pid < 0) {
             perror("Ошибка создания процесса");
             return 1;
-        } else if (pid == 0) { // Дочерний процесс
+        } else if (pid == 0) {
             close(fd[0]);
             srand(time(NULL) ^ (getpid() << 16));
             int random_number = rand();
 
-            kill(getppid(), SIGUSR1);
+            sem_wait(&semaphore);
 
-            sem_wait(semaphore);
             FILE *file = fopen("numbers.txt", "a");
             if (file != NULL) {
                 fprintf(file, "%d\n", random_number);
                 fclose(file);
             }
-            sem_post(semaphore);
 
-            kill(getppid(), SIGUSR2);
+            sem_post(&semaphore);
 
             exit(0);
         }
@@ -78,8 +54,8 @@ int main(int argc, char *argv[]) {
     }
 
     close(fd[0]);
-    sem_close(semaphore);
-    sem_unlink("/my_semaphore");
+
+    sem_destroy(&semaphore);
 
     return 0;
 }

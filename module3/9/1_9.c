@@ -3,30 +3,11 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <time.h>
-#include <signal.h>
 #include <semaphore.h>
-#include <fcntl.h>
-
-// Объявления функций обработчиков сигналов
-void child_signal_handler(int sig) {
-    static int access_blocked = 0;
-
-    if (sig == SIGUSR1) {
-        access_blocked = 1;
-    } else if (sig == SIGUSR2) {
-        access_blocked = 0;
-    }
-}
-
-void parent_signal_handler(int sig) {
-    if (sig == SIGUSR2) {
-        printf("Дочерний процесс завершил запись числа.\n");
-    }
-}
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        printf("Использование: %s <количество чисел>\n", argv[0]);
+        printf("%s <количество чисел>\n", argv[0]);
         return 1;
     }
 
@@ -34,15 +15,11 @@ int main(int argc, char *argv[]) {
     int fd[2];
     pipe(fd);
 
-    sem_t *read_sema = sem_open("/read_sema", O_CREAT, 0644, 1);
-    sem_t *write_sema = sem_open("/write_sema", O_CREAT, 0644, 1);
-    if (!read_sema || !write_sema) {
-        perror("Ошибка создания семафоров");
+    sem_t access_semaphore;
+    if (sem_init(&access_semaphore, 1, 1) == -1) {
+        perror("Ошибка инициализации семафора");
         return 1;
     }
-
-    signal(SIGUSR1, child_signal_handler);
-    signal(SIGUSR2, parent_signal_handler);
 
     for (int i = 0; i < count; ++i) {
         pid_t pid = fork();
@@ -50,22 +27,20 @@ int main(int argc, char *argv[]) {
         if (pid < 0) {
             perror("Ошибка создания процесса");
             return 1;
-        } else if (pid == 0) { // Дочерний процесс
+        } else if (pid == 0) {
             close(fd[0]);
             srand(time(NULL) ^ (getpid() << 16));
             int random_number = rand();
 
-            sem_wait(read_sema); // Ждем, пока никто не будет читать
-            sem_wait(write_sema); // Захватываем семафор записи
+            sem_wait(&access_semaphore);
+
             FILE *file = fopen("numbers.txt", "a");
             if (file != NULL) {
                 fprintf(file, "%d\n", random_number);
                 fclose(file);
             }
-            sem_post(write_sema); // Освобождаем семафор записи
-            sem_post(read_sema); // Повышаем счетчик чтения
 
-            kill(getppid(), SIGUSR2);
+            sem_post(&access_semaphore);
 
             exit(0);
         }
@@ -79,10 +54,8 @@ int main(int argc, char *argv[]) {
     }
 
     close(fd[0]);
-    sem_close(read_sema);
-    sem_close(write_sema);
-    sem_unlink("/read_sema");
-    sem_unlink("/write_sema");
+
+    sem_destroy(&access_semaphore);
 
     return 0;
 }
