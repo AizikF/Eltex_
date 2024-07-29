@@ -3,15 +3,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <time.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
-
-union semun {
-    int val;
-    struct semid_ds *buf;
-    unsigned short *array;
-    struct seminfo *__buf;
-};
+#include <semaphore.h>
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -21,21 +13,8 @@ int main(int argc, char *argv[]) {
 
     int count = atoi(argv[1]);
 
-    key_t key = ftok("numbers.txt", 65);
-    if (key == -1) {
-        perror("Ошибка создания ключа");
-        return 1;
-    }
-
-    int semid = semget(key, 1, 0666 | IPC_CREAT);
-    if (semid == -1) {
-        perror("Ошибка создания семафора");
-        return 1;
-    }
-
-    union semun arg;
-    arg.val = 1;
-    if (semctl(semid, 0, SETVAL, arg) == -1) {
+    sem_t sem_write;
+    if (sem_init(&sem_write, 1, 1) == -1) {
         perror("Ошибка инициализации семафора");
         return 1;
     }
@@ -50,17 +29,16 @@ int main(int argc, char *argv[]) {
             srand(time(NULL) ^ (getpid() << 16));
             int random_number = rand();
 
-            struct sembuf sb = {0, -1, 0};
-            semop(semid, &sb, 1);
+            sem_wait(&sem_write);
 
+            printf("%d ", random_number); 
             FILE *file = fopen("numbers.txt", "a");
             if (file != NULL) {
                 fprintf(file, "%d\n", random_number);
                 fclose(file);
             }
 
-            sb.sem_op = 1;
-            semop(semid, &sb, 1);
+            sem_post(&sem_write);
 
             exit(0);
         }
@@ -68,13 +46,10 @@ int main(int argc, char *argv[]) {
 
     int status;
     while ((wait(&status) > 0)) {
-        printf("Ожидание завершения всех дочерних процессов...\n");
+        printf("\nОжидание завершения всех дочерних процессов...\n");
     }
 
-    if (semctl(semid, 0, IPC_RMID, arg) == -1) {
-        perror("Ошибка уничтожения семафора");
-        return 1;
-    }
+    sem_destroy(&sem_write);
 
     return 0;
 }
