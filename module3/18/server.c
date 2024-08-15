@@ -6,7 +6,7 @@
 #include <sys/select.h>
 #include <errno.h>
 
-#define PORT 9999
+#define PORT 666
 #define MAX_CLIENTS 10
 
 void calculate(char *operation, double num1, double num2, char *result)
@@ -38,7 +38,7 @@ int main()
     char buffer[1024] = {0};
     char result[1024] = {0};
 
-    // Массив сокетов для обработки нескольких клиентов
+
     int client_sockets[MAX_CLIENTS] = {0};
 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -72,17 +72,17 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    printf("Сервер слушает порт 9999\n");
+    printf("Сервер слушает порт 666\n");
     while (1)
     {
-        // Сбросить множественный набор
+
         FD_ZERO(&readfds);
 
-        // Добавить серверный сокет в набор
+
         FD_SET(server_fd, &readfds);
         max_sd = server_fd;
 
-        // Добавить клиентские сокеты
+
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
             int sd = client_sockets[i];
@@ -92,7 +92,6 @@ int main()
                 max_sd = sd;
         }
 
-        // Ожидание активности в сетевых сокетах
         int activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
 
         if ((activity < 0) && (errno != EINTR))
@@ -100,7 +99,6 @@ int main()
             perror("select error");
         }
 
-        // Если есть входящее соединение на серверный сокет
         if (FD_ISSET(server_fd, &readfds))
         {
             if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0)
@@ -111,7 +109,6 @@ int main()
 
             printf("Новое соединение: socket fd %d, ip %s, port %d\n", new_socket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
-            // Добавить новый сокет в массив клиентских сокетов
             for (int i = 0; i < MAX_CLIENTS; i++)
             {
                 if (client_sockets[i] == 0)
@@ -123,7 +120,7 @@ int main()
             }
         }
 
-        // Обработка входящих сообщений от всех клиентов
+
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
             int sd = client_sockets[i];
@@ -132,16 +129,16 @@ int main()
                 int valread = read(sd, buffer, 1024);
                 if (valread == 0)
                 {
-                    // Клиент отключился, закрываем сокет
+
                     getpeername(sd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
                     printf("Клиент отключился: socket fd %d, ip %s, port %d\n", sd, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
                     close(sd);
-                    client_sockets[i] = 0; // Удаляем сокет из массива
+                    client_sockets[i] = 0; /
                 }
                 else
                 {
-                    // Обрабатываем входящее сообщение
-                    buffer[valread] = '\0'; // Завершаем строку
+
+                    buffer[valread] = '\0'; /
                     printf("Получено от клиента (socket fd %d): %s\n", sd, buffer);
 
                     char operation[10];

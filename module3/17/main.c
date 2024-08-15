@@ -8,43 +8,31 @@
 
 #define BUFFER_SIZE 65536
 
-void save_packet(unsigned char *buff, int size)
-{
-    FILE *fp = fopen("captured_packets.bin", "ab");
-    if (!fp) {
-        perror("Error opening file");
-        return;
-    }
-
-    fwrite(buff, size, 1, fp);
-    fclose(fp);
-}
-
 void process_packet(unsigned char *buff, int size)
 {
-    struct iphdr *iph = (struct iphdr *)buff;
+    struct iphdr *iph = (struct iphdr *) buff;
     unsigned short iphdrlen = iph->ihl * 4;
-    struct udphdr *udph = (struct udphdr *)(buff + iphdrlen);
+    struct udphdr *udph = (struct udphdr *) (buff + iphdrlen);
 
     unsigned short source_port = ntohs(udph->source);
     unsigned short dest_port = ntohs(udph->dest);
 
-    if (source_port == 9999 || dest_port == 9999)
+    if (source_port == 667 || dest_port == 667)
     {
         printf("Received TCP Packet:\n");
         printf("From: %u.%u.%u.%u:%d\n",
-               (iph->saddr) & 0xFF,
-               (iph->saddr >> 8) & 0xFF,
-               (iph->saddr >> 16) & 0xFF,
-               (iph->saddr >> 24) & 0xFF,
-               ntohs(udph->source));
+                (iph->saddr) & 0xFF,
+                (iph->saddr >> 8) & 0xFF,
+                (iph->saddr >> 16) & 0xFF,
+                (iph->saddr >> 24) & 0xFF,
+                ntohs(udph->source));
 
         printf("To: %u.%u.%u.%u:%d\n",
-               (iph->daddr) & 0xFF,
-               (iph->daddr >> 8) & 0xFF,
-               (iph->daddr >> 16) & 0xFF,
-               (iph->daddr >> 24) & 0xFF,
-               ntohs(udph->dest));
+                (iph->daddr) & 0xFF,
+                (iph->daddr >> 8) & 0xFF,
+                (iph->daddr >> 16) & 0xFF,
+                (iph->daddr >> 24) & 0xFF,
+                ntohs(udph->dest));
 
         printf("Data (Payload): ");
 
@@ -55,9 +43,8 @@ void process_packet(unsigned char *buff, int size)
             printf("%02X ", data[i]);
         }
         printf("\n\n");
-
-        save_packet(buff, size);
     }
+
 }
 
 int main()
